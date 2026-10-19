@@ -1,0 +1,30 @@
+{
+  "name": "restaurante-os",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sistema operacional de restaurante: comandas, mesas, produção e sincronização offline-first entre aparelhos, com push em tempo real e Postgres opcional.",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node server/server.mjs",
+    "start:pg": "DATABASE_URL=${DATABASE_URL:-postgres://restaurante:restaurante@localhost:5432/restaurante} node server/server.mjs",
+    "test": "node --test",
+    "test:pg": "BANCO=postgres node --test",
+    "test:dominio": "node --test packages/domain/domain.test.mjs",
+    "test:api": "node --test tests/api.test.mjs",
+    "test:sync": "node --test tests/multidevice.test.mjs",
+    "test:push": "node --test tests/push.test.mjs",
+    "test:ui": "node --test tests/ui-connected.test.mjs"
+  },
+  "dependencies": {},
+  "optionalDependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.2.0",
+    "jsdom": "^24.0.0"
+  },
+  "comment": "Sem Postgres o produto roda com ZERO dependências (node:sqlite, node:http, node:crypto — o WebSocket é implementado no próprio repo). `pg` é opcional e só entra quando DATABASE_URL está definido. `@electric-sql/pglite` (Postgres em WASM) e `jsdom` existem só para os testes."
+}
