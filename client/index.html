@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<meta name="description" content="Restaurante OS — comandas, mesas e produção, sincronizado entre aparelhos.">
+<title>Restaurante OS — Comandas</title>
+<link rel="stylesheet" href="./estilos.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-logo">🍽️</div>
+      <div class="brand-text">
+        <h1 id="brandName">Meu Restaurante</h1>
+        <p>Controle de comandas e mesas</p>
+      </div>
+    </div>
+    <div class="top-stats">
+      <div class="pill optional">Mesas <b id="statTables">0/0</b></div>
+      <div class="sync-pill" id="syncEstado" title="Estado da sincronização">—</div>
+      <div class="pill optional">Hoje <b id="statToday">R$ 0,00</b></div>
+      <button class="icon-btn" id="btnNotices" title="Avisos" aria-label="Avisos">🔔</button>
+      <button class="waiter-pill none" id="btnWaiter" title="Garçom / acesso">
+        <span class="avatar" id="waiterAvatar">?</span><span class="nm" id="waiterLabel">Entrar</span>
+        <span class="role-badge" id="roleTag" hidden>ADMIN</span>
+      </button>
+      <button class="icon-btn" id="btnConfig" title="Configurações" aria-label="Configurações">⚙️</button>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tabs-inner">
+    <button class="tab active" data-view="mesas">🪑 Mesas</button>
+    <button class="tab" data-view="producao">🍳 Produção</button>
+    <button class="tab" data-view="produtos">🍺 Produtos</button>
+    <button class="tab" data-view="garcons">👤 Equipe</button>
+    <button class="tab" data-view="historico">📋 Histórico</button>
+  </div>
+</nav>
+
+<main>
+  <!-- ============ MESAS ============ -->
+  <section id="view-mesas">
+    <div class="section-head">
+      <div>
+        <h2>Mesas</h2>
+        <p id="mesasSub">Toque em uma mesa livre para abrir a comanda.</p>
+      </div>
+      <div class="legend">
+        <span><i class="dot free"></i> Livre</span>
+        <span><i class="dot busy"></i> Ocupada</span>
+      </div>
+    </div>
+    <div class="grid-tables" id="gridTables"></div>
+  </section>
+
+  <!-- ============ PAINEL DE PRODUÇÃO ============ -->
+  <section id="view-producao" hidden>
+    <div class="section-head">
+      <div>
+        <h2>Painel de produção</h2>
+        <p id="prodSub">Tudo que está para sair, de todas as mesas, por setor.</p>
+      </div>
+      <button class="btn sm" id="btnPrintPanel">🖨️ Imprimir painel</button>
+    </div>
+    <div class="hist-summary">
+      <div class="card stat"><div class="lbl">Itens pendentes</div><div class="val" id="prodTotal">0</div></div>
+      <div class="card stat"><div class="lbl">Mesas com pendência</div><div class="val" id="prodTables">0</div></div>
+      <div class="card stat"><div class="lbl">Espera mais longa</div><div class="val" id="prodOldest">—</div></div>
+    </div>
+    <div class="prod-undo" id="prodUndo" hidden></div>
+    <div class="chip-row" id="prodSectorChips"></div>
+    <div class="prod-legend">
+      <span><i class="w"></i>atenção: mais de 10 min</span>
+      <span><i class="l"></i>atrasado: mais de 20 min</span>
+    </div>
+    <div id="prodPanel"></div>
+  </section>
+
+  <!-- ============ PRODUTOS ============ -->
+  <section id="view-produtos" hidden>
+    <div class="section-head">
+      <div>
+        <h2>Produtos</h2>
+        <p>Catálogo usado na montagem das comandas.</p>
+      </div>
+      <button class="btn primary" id="btnNewProduct">＋ Novo produto</button>
+    </div>
+    <div class="notice" id="prodReadOnly" hidden>
+      🔒
+      <div>Seu perfil é <b>operador</b>: o catálogo fica <b>somente leitura</b>. Você pode usar os produtos nas comandas,
+        mas cadastrar, alterar ou ativar/desativar depende de um administrador.</div>
+    </div>
+    <div class="prod-toolbar">
+      <div class="search">
+        <span>🔍</span>
+        <input type="search" id="prodSearch" placeholder="Buscar por nome, categoria ou código..." autocomplete="off">
+      </div>
+    </div>
+    <div class="prod-count" id="prodCount"></div>
+    <div class="chip-row" id="prodChips"></div>
+    <div class="prod-grid" id="gridProducts"></div>
+  </section>
+
+  <!-- ============ HISTÓRICO ============ -->
+  <section id="view-historico" hidden>
+    <div class="section-head">
+      <div>
+        <h2>Histórico de comandas</h2>
+        <p>Comandas encerradas e seus totais.</p>
+      </div>
+      <div class="chip-row" style="margin:0; align-items:center">
+        <button class="chip active" data-range="today">Hoje</button>
+        <button class="chip" data-range="7">7 dias</button>
+        <button class="chip" data-range="30">30 dias</button>
+        <button class="chip" data-range="all">Tudo</button>
+        <select class="select-inline" id="histWaiterFilter" title="Filtrar por garçom">
+          <option value="">Todos os garçons</option>
+        </select>
+      </div>
+    </div>
+    <div class="hist-summary">
+      <div class="card stat"><div class="lbl">Comandas</div><div class="val" id="histCount">0</div></div>
+      <div class="card stat"><div class="lbl">Total vendido</div><div class="val" id="histTotal">R$ 0,00</div></div>
+      <div class="card stat"><div class="lbl">Descontos</div><div class="val" id="histDisc">R$ 0,00</div></div>
+      <div class="card stat"><div class="lbl">Ticket médio</div><div class="val" id="histAvg">R$ 0,00</div></div>
+    </div>
+    <div id="waiterSummary"></div>
+    <div class="hist-list" id="histList"></div>
+  </section>
+
+  <!-- ============ GARÇONS ============ -->
+  <section id="view-garcons" hidden>
+    <div class="section-head">
+      <div>
+        <h2>Equipe</h2>
+        <p>Quem acessa o sistema, com qual perfil e quem abriu cada comanda.</p>
+      </div>
+      <button class="btn primary" id="btnNewWaiter">＋ Novo usuário</button>
+    </div>
+    <div class="card" style="padding:14px 16px; margin-bottom:16px; display:flex; gap:12px; align-items:flex-start">
+      <div style="font-size:20px; line-height:1.2">🔐</div>
+      <div style="font-size:13.5px; color:var(--muted)">
+        Ao abrir uma comanda o sistema pede a identificação de quem está atendendo; se houver PIN cadastrado, ele é exigido.
+        Cada comanda guarda quem a abriu e o histórico gera o total vendido por pessoa. O <b>perfil</b> de cada usuário
+        define o que ele pode fazer — veja a matriz em <b>Configurações → Perfis de usuário</b>.
+      </div>
+    </div>
+    <div class="prod-grid" id="gridWaiters"></div>
+  </section>
+</main>
+
+<!-- ============ MODAL: COMANDA ============ -->
+<div class="overlay" id="overlayComanda" hidden></div>
+<div class="modal drawer" id="modalComanda" hidden>
+  <div class="sheet">
+    <div class="cmd-head">
+      <div class="row">
+        <div>
+          <h3 id="cmdTitle">Mesa 1</h3>
+          <div class="sub" id="cmdSub">Comanda #1</div>
+          <button class="waiter-btn" id="cmdWaiterBtn" title="Trocar o garçom desta comanda">👤 <span id="cmdWaiterName">Sem garçom</span></button>
+          <button class="cmd-avisar" id="btnAvisar" title="Enviar um aviso para outro usuário">🔔 Avisar</button>
+          <button class="cmd-avisar" id="btnMover" title="Mover a comanda para outra mesa ou juntar duas comandas">⇄ Mover/Juntar</button>
+        </div>
+        <button class="x" data-close="comanda" aria-label="Fechar">✕</button>
+      </div>
+    </div>
+
+    <div class="add-zone">
+      <div class="search">
+        <span>🔍</span>
+        <input type="search" id="cmdSearch" placeholder="Buscar produto para adicionar...">
+      </div>
+      <div class="prod-pick" id="cmdPicks"></div>
+    </div>
+
+    <div class="prod-bar" id="prodBar" hidden>
+      🖨️ <span id="prodBarText"></span>
+      <button class="btn sm" id="btnPedido">Enviar para produção</button>
+    </div>
+
+    <div class="items" id="cmdItems"></div>
+
+    <div class="cmd-foot">
+      <div id="discBlock">
+        <div class="disc-row">
+          <label for="discValue">Desconto</label>
+          <select id="discType">
+            <option value="value">R$</option>
+            <option value="percent">%</option>
+          </select>
+          <input type="number" id="discValue" min="0" step="0.01" value="0" inputmode="decimal">
+        </div>
+        <div class="disc-row" id="discHintRow" hidden>
+          <span class="hint" id="discHint" style="margin:0"></span>
+        </div>
+      </div>
+      <div class="fee-row" id="feeBlock" hidden>
+        <span class="t">Taxa de serviço</span>
+        <label class="switch" for="feeOn" title="Incluir a taxa de serviço nesta comanda">
+          <input type="checkbox" id="feeOn"><span id="feePctLabel">10%</span>
+        </label>
+      </div>
+      <div class="tot-line"><span>Subtotal</span><span id="cmdSubtotal">R$ 0,00</span></div>
+      <div class="tot-line" id="cmdDiscLine"><span>Desconto</span><span id="cmdDisc">- R$ 0,00</span></div>
+      <div class="tot-line" id="cmdFeeLine" hidden><span>Taxa de serviço (<span id="cmdFeePct">10</span>%)</span><span id="cmdFee">+ R$ 0,00</span></div>
+      <div class="tot-line grand"><span>Total</span><span id="cmdTotal">R$ 0,00</span></div>
+      <div id="cmdPayBlock" hidden>
+        <div class="tot-line"><span>Pago <span id="cmdPayCount"></span></span><span id="cmdPaid" class="neg">R$ 0,00</span></div>
+        <div class="tot-line"><span>Falta</span><span id="cmdRemain">R$ 0,00</span></div>
+      </div>
+      <div class="cmd-actions">
+        <button class="btn danger" id="btnCancelComanda">Cancelar</button>
+        <button class="btn" id="btnSplit">Dividir</button>
+        <button class="btn primary" id="btnCloseComanda">Encerrar e pagar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: PAGAMENTO ============ -->
+<div class="overlay" id="overlayPay" hidden></div>
+<div class="modal" id="modalPay" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div>
+        <h3>Registrar pagamento</h3>
+        <p id="paySub">Mesa 1 · Comanda #1</p>
+      </div>
+      <button class="x" data-close="pay" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="total-box">
+        <div class="l">Total a pagar</div>
+        <div class="v" id="payTotal">R$ 0,00</div>
+      </div>
+      <div class="field">
+        <label>Forma de pagamento</label>
+        <div class="pay-methods" id="payMethods">
+          <button type="button" class="pay active" data-method="Dinheiro">💵 Dinheiro</button>
+          <button type="button" class="pay" data-method="PIX">⚡ PIX</button>
+          <button type="button" class="pay" data-method="Débito">💳 Débito</button>
+          <button type="button" class="pay" data-method="Crédito">💳 Crédito</button>
+        </div>
+      </div>
+      <div class="field" id="fieldReceived" hidden>
+        <label for="payReceived">Valor recebido</label>
+        <input type="number" id="payReceived" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+        <div class="hint" id="payChangeHint">Troco: R$ 0,00</div>
+      </div>
+
+      <!-- POS / maquininha: aparece em Crédito e Débito -->
+      <div class="field" id="posBlock" hidden>
+        <label for="payTerminalSel">Maquininha</label>
+        <select id="payTerminalSel" class="select-inline" style="width:100%; max-width:none"></select>
+        <button class="btn primary block" id="btnSendPos" style="margin-top:10px"></button>
+        <div id="payCardBox"></div>
+        <button class="pos-link" id="btnManualCard">Registrar NSU / autorização manualmente</button>
+        <div id="manualCardBox" hidden>
+          <div class="row-2">
+            <div class="field">
+              <label for="manBrand">Bandeira</label>
+              <select id="manBrand" class="select-inline" style="width:100%"></select>
+            </div>
+            <div class="field">
+              <label for="manInst">Parcelas</label>
+              <input type="number" id="manInst" min="1" max="12" step="1" value="1">
+            </div>
+          </div>
+          <div class="row-2">
+            <div class="field"><label for="manNsu">NSU</label><input type="text" id="manNsu" inputmode="numeric" placeholder="000000"></div>
+            <div class="field"><label for="manAuth">Autorização</label><input type="text" id="manAuth" inputmode="numeric" placeholder="000000"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn primary block" id="btnConfirmPay">Confirmar pagamento e liberar mesa</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: DIVISÃO / PAGAMENTOS PARCIAIS ============ -->
+<div class="overlay" id="overlaySplit" hidden></div>
+<div class="modal wide" id="modalSplit" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div><h3>Dividir a conta</h3><p id="splitSub">Mesa 1</p></div>
+      <button class="x" data-close="split" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="split-tabs">
+        <button class="chip active" data-split="pessoa">👥 Por pessoa</button>
+        <button class="chip" data-split="item">🧾 Por item</button>
+      </div>
+
+      <div id="splitPessoa">
+        <div class="row-2" style="margin-bottom:12px">
+          <div class="field" style="margin:0">
+            <label for="splitN">Número de pessoas</label>
+            <input type="number" id="splitN" min="2" max="30" step="1" value="2">
+          </div>
+          <div class="field" style="margin:0">
+            <label for="splitPer">Valor por pessoa</label>
+            <input type="text" id="splitPer" readonly>
+          </div>
+        </div>
+        <div id="splitPeople"></div>
+      </div>
+
+      <div id="splitItem" hidden>
+        <p class="hint" style="margin:0 0 10px; color:var(--muted); font-size:12.5px">
+          Marque os itens que esta pessoa vai pagar. Itens já pagos aparecem esmaecidos.
+        </p>
+        <div id="splitItems"></div>
+      </div>
+
+      <div class="field" style="margin:16px 0 0">
+        <label>Forma de pagamento</label>
+        <div class="pay-methods" id="splitMethods" style="margin-bottom:0">
+          <button type="button" class="pay active" data-method="Dinheiro">💵 Dinheiro</button>
+          <button type="button" class="pay" data-method="PIX">⚡ PIX</button>
+          <button type="button" class="pay" data-method="Débito">💳 Débito</button>
+          <button type="button" class="pay" data-method="Crédito">💳 Crédito</button>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <div class="tot-line"><span>Já pago</span><span id="splitPaid" class="neg">R$ 0,00</span></div>
+      <div class="tot-line grand" style="font-size:17px"><span>Falta</span><span id="splitRemain">R$ 0,00</span></div>
+      <div style="display:flex; gap:9px; margin-top:11px">
+        <button class="btn" id="splitPayRest">Pagar restante</button>
+        <button class="btn primary" style="flex:1" id="splitPaySel" hidden>Receber selecionados</button>
+      </div>
+      <div id="splitHistory" style="margin-top:14px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: ENVIAR AVISO ============ -->
+<div class="overlay" id="overlayNotice" hidden></div>
+<div class="modal" id="modalNotice" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div><h3>Avisar alguém</h3><p id="noticeSub">Mesa 1</p></div>
+      <button class="x" data-close="notice" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field">
+        <label for="noticeTo">Para quem</label>
+        <select id="noticeTo" class="select-inline" style="width:100%; max-width:none"></select>
+      </div>
+      <button class="btn warn block" id="btnSendCall" style="padding:14px">🔔 Chamar na mesa</button>
+      <div class="hint" style="text-align:center; margin:8px 0 16px">Chamado direto, sem escrever nada.</div>
+
+      <div class="field" style="margin:0 0 8px">
+        <label for="noticeText">Ou escreva um recado</label>
+      </div>
+      <div class="preset-row" id="noticePresets"></div>
+      <div class="field">
+        <textarea id="noticeText" rows="3" maxlength="160" style="width:100%; border:1px solid var(--line);
+          border-radius:12px; padding:11px 12px; font-family:inherit; font-size:15px; resize:vertical; outline:0"
+          placeholder="Ex.: precisa de mais 2 chopps"></textarea>
+        <div class="hint">A mensagem vai junto com o número da mesa.</div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn primary block" id="btnSendText">Enviar recado</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: AVISOS RECEBIDOS ============ -->
+<div class="overlay" id="overlayNotices" hidden></div>
+<div class="modal wide" id="modalNotices" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div><h3>Avisos</h3><p>Chamados e recados da equipe</p></div>
+      <button class="x" data-close="notices" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="alert-row">
+        <label class="mini-check" for="alertSound"><input type="checkbox" id="alertSound"> 🔔 Som</label>
+        <label class="mini-check" for="alertVibrate"><input type="checkbox" id="alertVibrate"> 📳 Vibração</label>
+        <button class="btn sm" id="btnTestAlert">Testar</button>
+      </div>
+      <div id="noticesList"></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn block" id="btnReadAll">Marcar todos como lidos</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: PRODUÇÃO (COZINHA / BAR) ============ -->
+<div class="overlay" id="overlayPedido" hidden></div>
+<div class="modal wide" id="modalPedido" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div><h3>Enviar para produção</h3><p id="pedidoSub">Mesa 1</p></div>
+      <button class="x" data-close="pedido" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="hint" id="pedidoHint" style="margin:0 0 14px"></div>
+      <div id="pedidoList"></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn primary block" id="btnPedidoPrint">Imprimir e marcar como enviado</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: MOVER / JUNTAR MESAS ============ -->
+<div class="overlay" id="overlayMove" hidden></div>
+<div class="modal wide" id="modalMove" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div><h3>Mover ou juntar mesa</h3><p id="moveSub">Mesa 1</p></div>
+      <button class="x" data-close="move" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="hint" id="moveHint" style="margin:0 0 14px"></div>
+      <div class="move-grid" id="moveGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: AUTORIZAÇÃO DE DESCONTO ============ -->
+<div class="overlay" id="overlayDiscAuth" hidden></div>
+<div class="modal" id="modalDiscAuth" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div><h3>Autorização necessária</h3><p id="discAuthSub">Mesa 1</p></div>
+      <button class="x" data-close="discAuth" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="auth-box" id="discAuthInfo"></div>
+      <div class="field">
+        <label for="discAuthWho">Administrador que autoriza</label>
+        <select id="discAuthWho" class="select-inline" style="width:100%; max-width:none"></select>
+      </div>
+      <div class="field" id="discAuthPinField" hidden>
+        <label for="discAuthPin">PIN do administrador</label>
+        <input type="password" id="discAuthPin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••">
+        <div class="hint" id="discAuthErr" style="color:var(--danger); display:none">PIN incorreto.</div>
+      </div>
+      <div class="hint">A autorização fica registrada na trilha de auditoria com nome, horário e percentual.</div>
+    </div>
+    <div class="sheet-foot" style="display:flex; gap:9px">
+      <button class="btn" id="btnDiscAuthCancel">Cancelar</button>
+      <button class="btn primary" style="flex:1" id="btnDiscAuthOk">Autorizar desconto</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: POS / MAQUININHA ============ -->
+<div class="overlay" id="overlayPos" hidden></div>
+<div class="modal" id="modalPos" hidden>
+  <div class="sheet" style="max-width:460px">
+    <div class="sheet-head">
+      <div><h3>Cobrar na maquininha</h3><p id="posSub">—</p></div>
+      <button class="x" data-close="pos" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="pos-amount"><span>R$</span><b id="posAmount">0,00</b></div>
+      <div class="pos-term" id="posTerminal"></div>
+      <div class="pos-steps" id="posSteps"></div>
+      <div class="field" style="margin:14px 0 0">
+        <label>Bandeira</label>
+        <div class="brand-row" id="posBrands"></div>
+        <div class="hint">Usada quando a maquininha não devolve a bandeira (ou no simulador).</div>
+      </div>
+      <div id="posResult"></div>
+      <div id="posSimNote"></div>
+    </div>
+    <div class="sheet-foot" style="display:flex; gap:9px">
+      <button class="btn danger" id="posCancel">Cancelar</button>
+      <button class="btn primary" id="posContinue" hidden style="flex:1">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: MAQUININHA (CADASTRO) ============ -->
+<div class="overlay" id="overlayTerminal" hidden></div>
+<div class="modal" id="modalTerminal" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3 id="terminalModalTitle">Nova maquininha</h3>
+      <button class="x" data-close="terminal" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field">
+        <label for="tLabel">Apelido</label>
+        <input type="text" id="tLabel" placeholder="Ex.: Maquininha do balcão" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="tModel">Modelo / fabricante</label>
+        <select id="tModel"></select>
+      </div>
+      <div class="field">
+        <label for="tMode">Forma de integração</label>
+        <select id="tMode">
+          <option value="sim">Simulador (demonstração)</option>
+          <option value="tef">Bridge local (TEF / Sitef)</option>
+          <option value="sdk">SDK do terminal (SmartPOS)</option>
+        </select>
+        <div class="hint" id="tModeHint"></div>
+      </div>
+      <div class="field" id="tEndpointField" hidden>
+        <label for="tEndpoint">Endereço do bridge</label>
+        <input type="text" id="tEndpoint" placeholder="http://127.0.0.1:8787" autocomplete="off">
+        <div class="hint">Contrato: <code>POST /charge</code> → <code>{status, brand, nsu, authorizationCode}</code>; para fluxo assíncrono, <code>GET /status?id=</code>. O bridge precisa liberar CORS para esta página.</div>
+      </div>
+      <label class="check" for="tActive">
+        <input type="checkbox" id="tActive">
+        <span>Maquininha ativa</span>
+      </label>
+      <label class="check" for="tDefault" style="margin-top:10px">
+        <input type="checkbox" id="tDefault">
+        <span>Usar como maquininha padrão</span>
+      </label>
+    </div>
+    <div class="sheet-foot" style="display:flex; gap:9px">
+      <button class="btn danger" id="btnDeleteTerminal" hidden>Excluir</button>
+      <button class="btn primary" style="flex:1" id="btnSaveTerminal">Salvar maquininha</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: RECIBO ============ -->
+<div class="overlay" id="overlayReceipt" hidden></div>
+<div class="modal" id="modalReceipt" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div><h3 id="receiptTitle">Comprovante</h3><p id="receiptSub"></p></div>
+      <button class="x" data-close="receipt" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div id="receiptContent" class="receipt"></div>
+    </div>
+    <div class="sheet-foot" style="display:flex; gap:9px">
+      <button class="btn" id="btnPrintReceipt">🖨️ Imprimir</button>
+      <button class="btn primary" style="flex:1" data-close="receipt">Concluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: PRODUTO ============ -->
+<div class="overlay" id="overlayProduct" hidden></div>
+<div class="modal" id="modalProduct" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3 id="productModalTitle">Novo produto</h3>
+      <button class="x" data-close="product" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field">
+        <label for="pName">Nome do produto</label>
+        <input type="text" id="pName" placeholder="Ex.: Cerveja Long Neck" autocomplete="off">
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="pPrice">Preço (R$)</label>
+          <input type="number" id="pPrice" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+        </div>
+        <div class="field">
+          <label for="pCat">Categoria</label>
+          <input type="text" id="pCat" list="catList" placeholder="Ex.: Bebidas">
+          <datalist id="catList"></datalist>
+        </div>
+      </div>
+      <div class="field">
+        <label for="pSector">Setor de preparo</label>
+        <input type="text" id="pSector" list="sectorList" placeholder="Ex.: Cozinha">
+        <datalist id="sectorList"></datalist>
+        <div class="hint">Define em qual via de produção o item é impresso.</div>
+      </div>
+      <label class="check" for="pActive" id="pActiveWrap">
+        <input type="checkbox" id="pActive" checked>
+        <span>Produto ativo (aparece na comanda)</span>
+      </label>
+    </div>
+    <div class="sheet-foot" style="display:flex; gap:9px">
+      <button class="btn danger" id="btnDeleteProduct" hidden>Excluir</button>
+      <button class="btn primary" style="flex:1" id="btnSaveProduct">Salvar produto</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: CONFIGURAÇÕES ============ -->
+<div class="overlay" id="overlayConfig" hidden></div>
+<div class="modal wide" id="modalConfig" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3>Configurações</h3>
+      <button class="x" data-close="config" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field">
+        <label for="cName">Nome do estabelecimento</label>
+        <input type="text" id="cName" placeholder="Meu Restaurante">
+      </div>
+      <div class="field">
+        <label for="cTables">Quantidade de mesas</label>
+        <input type="number" id="cTables" min="1" max="80" step="1">
+        <div class="hint">Mesas ocupadas não podem ser removidas.</div>
+      </div>
+      <label class="check" for="cDiscount">
+        <input type="checkbox" id="cDiscount">
+        <span>Permitir desconto nas comandas</span>
+      </label>
+      <label class="check" for="cRequireWaiter" style="margin-top:10px">
+        <input type="checkbox" id="cRequireWaiter">
+        <span>Exigir garçom identificado para abrir comanda</span>
+      </label>
+
+      <hr style="border:0;border-top:1px solid var(--line); margin:18px 0">
+      <div class="field" style="margin:0 0 4px">
+        <label for="cSectors">Setores de produção</label>
+        <input type="text" id="cSectors" placeholder="Cozinha, Bar">
+        <div class="hint">Separe por vírgula. Cada setor vira uma via própria no pedido impresso.</div>
+      </div>
+
+      <hr style="border:0;border-top:1px solid var(--line); margin:18px 0">
+      <div class="field" style="margin:0 0 10px">
+        <label style="margin-bottom:2px">Taxa de serviço</label>
+        <div class="hint" style="margin-top:0">Cobrança opcional, ligada comanda a comanda.</div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="cFeePct">Percentual (%)</label>
+          <input type="number" id="cFeePct" min="0" max="100" step="0.5">
+        </div>
+        <div class="field" style="display:flex; align-items:flex-end">
+          <label class="check" for="cFeeDefault" style="width:100%">
+            <input type="checkbox" id="cFeeDefault">
+            <span>Já vem ligada</span>
+          </label>
+        </div>
+      </div>
+
+      <hr style="border:0;border-top:1px solid var(--line); margin:18px 0">
+      <div class="field" style="margin:0 0 10px">
+        <label style="margin-bottom:2px">Alerta de avisos</label>
+        <div class="hint" style="margin-top:0">Como o aparelho avisa quando um aviso chega. Vale para este dispositivo.</div>
+      </div>
+      <label class="check" for="cAlertSound">
+        <input type="checkbox" id="cAlertSound">
+        <span>Tocar um som curto ao receber um aviso</span>
+      </label>
+      <label class="check" for="cAlertVibrate" style="margin-top:10px">
+        <input type="checkbox" id="cAlertVibrate">
+        <span>Vibrar ao receber um aviso</span>
+      </label>
+      <button class="btn sm" id="btnTestAlert2" style="margin-top:12px">🔊 Testar alerta</button>
+      <div class="hint">
+        O som exige um toque na tela para o navegador liberar o áudio. A vibração funciona no Android; o iPhone não expõe vibração para páginas web.
+      </div>
+
+      <!-- Seções administrativas: cada perfil vê apenas o que pode gerenciar -->
+      <div id="cfgTeam">
+      <hr style="border:0;border-top:1px solid var(--line); margin:18px 0">
+      <div class="field" style="margin:0 0 10px">
+        <label style="margin-bottom:4px">Perfis de usuário</label>
+        <div class="hint" style="margin-top:0">O perfil define o que cada pessoa pode fazer. Quem não está identificado usa as permissões do operador.</div>
+      </div>
+      <div class="perm-grid">
+        <div class="perm-card">
+          <h4><span class="role-badge adm">ADMIN</span></h4>
+          <ul>
+            <li>Acessar o sistema e visualizar mesas</li>
+            <li>Abrir e fechar comandas</li>
+            <li>Adicionar, remover e alterar produtos</li>
+            <li>Cadastrar e ativar/desativar produtos</li>
+            <li>Configurar mesas, terminais, equipe e backup</li>
+            <li>Registrar pagamentos e consultar histórico</li>
+          </ul>
+        </div>
+        <div class="perm-card">
+          <h4><span class="role-badge grt">GERENTE</span></h4>
+          <ul>
+            <li>Visualizar mesas e abrir comandas</li>
+            <li>Cadastrar, alterar e ativar/desativar produtos</li>
+            <li>Configurar mesas e dados do estabelecimento</li>
+            <li>Fechar comandas e registrar pagamentos</li>
+            <li>Histórico completo</li>
+            <li class="no">Não gerencia equipe, terminais nem backup</li>
+          </ul>
+        </div>
+        <div class="perm-card">
+          <h4><span class="role-badge op">OPERADOR</span></h4>
+          <ul>
+            <li>Visualizar mesas e abrir comandas</li>
+            <li>Adicionar produtos e alterar quantidades</li>
+            <li>Remover itens da comanda</li>
+            <li>Fechar comandas e registrar pagamentos</li>
+            <li>Consultar o histórico da operação</li>
+            <li class="no">Não altera produtos nem configurações</li>
+          </ul>
+        </div>
+      </div>
+      <label class="check" for="permProducts" style="margin-top:12px">
+        <input type="checkbox" id="permProducts">
+        <span>Permitir que o operador cadastre e altere produtos</span>
+      </label>
+      <label class="check" for="permToggleProducts" style="margin-top:10px">
+        <input type="checkbox" id="permToggleProducts">
+        <span>Permitir que o operador ative/desative produtos</span>
+      </label>
+      <label class="check" for="permSettings" style="margin-top:10px">
+        <input type="checkbox" id="permSettings">
+        <span>Permitir que o operador acesse as configurações (inclui equipe, terminais e backup)</span>
+      </label>
+      <div class="field" style="margin:16px 0 0">
+        <label>Perfil de cada usuário</label>
+        <div id="permUsers"></div>
+      </div>
+
+      <hr style="border:0;border-top:1px solid var(--line); margin:18px 0">
+      <div class="field" style="margin:0 0 10px">
+        <label for="cDiscLimit">Limite de desconto por perfil (%)</label>
+        <input type="number" id="cDiscLimit" min="0" max="100" step="1" style="max-width:160px">
+        <div class="hint">Acima deste percentual, o operador e o gerente precisam da autorização de um administrador.
+          Cada autorização fica registrada na trilha de auditoria.</div>
+      </div>
+      </div><!-- /cfgTeam -->
+
+      <div id="cfgTerminals">
+      <hr style="border:0;border-top:1px solid var(--line); margin:18px 0">
+      <div class="field" style="margin:0 0 10px">
+        <label style="margin-bottom:2px">Maquininhas (POS / TEF)</label>
+        <div class="hint" style="margin-top:0">
+          <b>SDK do terminal</b>: o app roda dentro de um invólucro nativo no SmartPOS e usa <code>window.POSBridge</code>.
+          <b>Bridge local (TEF)</b>: um agente no computador expõe <code>POST /charge</code>. <b>Simulador</b>: demonstração, nada real.
+        </div>
+      </div>
+      <div id="terminalList"></div>
+      <button class="btn sm" id="btnNewTerminal" style="margin-top:2px">＋ Adicionar maquininha</button>
+      </div><!-- /cfgTerminals -->
+
+      <div id="cfgBackup">
+      <hr style="border:0;border-top:1px solid var(--line); margin:18px 0">
+      <div class="field" style="margin:0 0 10px">
+        <label style="margin-bottom:2px">Trilha de auditoria</label>
+        <div class="hint" style="margin-top:0">Ações sensíveis: autorizações de desconto, cancelamentos e estornos.</div>
+      </div>
+      <div id="auditList"></div>
+
+      <hr style="border:0;border-top:1px solid var(--line); margin:18px 0">
+      <div class="field" style="margin:0">
+        <label>Backup dos dados</label>
+        <div style="display:flex; gap:9px; flex-wrap:wrap">
+          <button class="btn sm" id="btnExport">⬇️ Exportar backup</button>
+          <button class="btn sm" id="btnImport">⬆️ Importar backup</button>
+          <input type="file" id="fileImport" accept="application/json" hidden>
+        </div>
+        <div class="hint">Os dados ficam salvos neste navegador. Exporte um backup para não perdê-los.</div>
+      </div>
+      </div><!-- /cfgBackup -->
+    </div>
+    <div class="sheet-foot">
+      <button class="btn primary block" id="btnSaveConfig">Salvar configurações</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: ACESSO DO GARÇOM ============ -->
+<div class="overlay" id="overlayWaiterLogin" hidden></div>
+<div class="modal" id="modalWaiterLogin" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div><h3>Quem está atendendo?</h3><p>Selecione o garçom para identificar a comanda.</p></div>
+      <button class="x" data-close="waiterLogin" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="waiter-grid" id="wlList"></div>
+      <div id="wlPinBox" hidden>
+        <div class="field">
+          <label for="wlPin">PIN do garçom</label>
+          <input type="password" id="wlPin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••">
+          <div class="hint" id="wlErr" style="color:var(--danger); display:none">PIN incorreto. Tente novamente.</div>
+        </div>
+        <div style="display:flex; gap:9px">
+          <button class="btn" id="wlBack">Voltar</button>
+          <button class="btn primary" style="flex:1" id="wlConfirm">Entrar</button>
+        </div>
+      </div>
+      <div id="wlFoot" style="margin-top:14px">
+        <button class="btn ghost block" id="wlManage">Gerenciar garçons</button>
+        <button class="btn danger block" id="wlLogout" hidden style="margin-top:8px"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: GARÇOM ============ -->
+<div class="overlay" id="overlayWaiter" hidden></div>
+<div class="modal" id="modalWaiter" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3 id="waiterModalTitle">Novo garçom</h3>
+      <button class="x" data-close="waiter" aria-label="Fechar">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field">
+        <label for="wName">Nome do garçom</label>
+        <input type="text" id="wName" placeholder="Ex.: Ana Souza" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="wPin">PIN de acesso (opcional)</label>
+        <input type="text" id="wPin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Ex.: 1234">
+        <div class="hint">Apenas números, até 6 dígitos. Em branco = entra sem PIN.</div>
+      </div>
+      <div class="field">
+        <label for="wRole">Perfil de acesso</label>
+        <select id="wRole">
+          <option value="admin">Administrador — acesso total</option>
+          <option value="gerente">Gerente — operação, produtos e histórico</option>
+          <option value="operador">Operador — mesas, comandas e pagamentos</option>
+        </select>
+        <div class="hint" id="wRoleHint"></div>
+      </div>
+      <label class="check" for="wActive">
+        <input type="checkbox" id="wActive">
+        <span>Usuário ativo</span>
+      </label>
+    </div>
+    <div class="sheet-foot" style="display:flex; gap:9px">
+      <button class="btn danger" id="btnDeleteWaiter" hidden>Excluir</button>
+      <button class="btn primary" style="flex:1" id="btnSaveWaiter">Salvar garçom</button>
+    </div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+<div id="noticePopup" hidden></div>
+<div id="toast"></div>
+
+
+<!--
+  O domínio é carregado como MÓDULO: é exatamente o mesmo arquivo que o servidor
+  executa (../packages/domain/index.mjs). O app.js só começa quando ele chega,
+  para nunca existirem duas versões da regra de dinheiro.
+
+  Em teste (jsdom, que não executa modules) o domínio e o motor são injetados
+  antes, e o app.js inicia na hora.
+-->
+<script type="module">
+  import * as DOMINIO from '../packages/domain/index.mjs';
+  import * as SYNC from './sync-engine.mjs';
+  window.DOMINIO = DOMINIO;
+  window.SYNC = SYNC;
+  window.dispatchEvent(new Event('dominio-pronto'));
+</script>
+<script src="./app.js"></script>
+</body>
+</html>
