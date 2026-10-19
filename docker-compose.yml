@@ -1,0 +1,28 @@
+services:
+  banco:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: restaurante
+      POSTGRES_PASSWORD: restaurante
+      POSTGRES_DB: restaurante
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restaurante -d restaurante"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - dados-postgres:/var/lib/postgresql/data
+
+  api:
+    build: .
+    depends_on:
+      banco:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://restaurante:restaurante@banco:5432/restaurante
+      PORTA: 8787
+    ports:
+      - "8787:8787"
+
+volumes:
+  dados-postgres:
